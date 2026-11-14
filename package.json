@@ -1,0 +1,15 @@
+{
+  "name": "pluto-browser",
+  "version": "1.0.0",
+  "description": "A personal desktop browser built with Electron",
+  "main": "main.js",
+  "author": "Param Mavani",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.3.2"
+  }
+}

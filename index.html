@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+    http-equiv="Content-Security-Policy"
+    content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self';
+        img-src 'self' data:;
+        font-src 'self';
+        connect-src 'self';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self';
+    "
+>
+    <title>Pluto Browser</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header class="browser-header">
+
+        <!-- TAB STRIP -->
+        <div class="tab-strip">
+            <div id="tabs" class="tabs"></div>
+
+            <button id="newTab" class="new-tab" title="New tab">
+                +
+            </button>
+        </div>
+
+        <!-- NAVIGATION TOOLBAR -->
+        <div class="toolbar">
+
+            <button
+                id="brandHome"
+                class="brand"
+                type="button"
+                title="Go to Pluto homepage"
+            >
+                <span class="brand-icon">
+                    <img src="assets/pluto-logo.svg" alt="Pluto">
+                </span>
+                <span>PLUTO</span>
+            </button>
+
+            <div class="navigation">
+
+                <button id="back" title="Back" disabled>←</button>
+                <button id="forward" title="Forward" disabled>→</button>
+                <button id="reload" title="Reload">↻</button>
+
+                <form id="addressForm" class="address-form">
+
+                    <input
+                        id="addressInput"
+                        type="text"
+                        placeholder="Search or enter website address..."
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+
+                    <button type="submit" title="Search">⌕</button>
+
+                </form>
+
+                <button id="home" title="Home">⌂</button>
+
+                <button
+                    id="bookmarksButton"
+                    class="toolbar-icon"
+                    title="Show bookmarks"
+                    aria-label="Show bookmarks"
+                >
+                    ★
+                </button>
+
+                <button
+                    id="historyButton"
+                    class="toolbar-icon history-toolbar-button"
+                    title="Browsing history"
+                    aria-label="Browsing history"
+                >
+                    ◷
+                </button>
+
+            </div>
+
+        </div>
+
+    </header>
+
+    <!-- NEW TAB HOMEPAGE -->
+    <main id="homePage">
+
+        <div class="planet">
+            <img src="assets/pluto-logo.svg" alt="Pluto planet logo">
+        </div>
+
+        <h1>PLUTO</h1>
+
+        <p class="tagline">Explore your universe.</p>
+
+        <form id="homeSearchForm" class="home-search">
+
+            <input
+                id="homeSearchInput"
+                type="text"
+                placeholder="Search the web or enter an address..."
+                autocomplete="off"
+            >
+
+            <button type="submit" title="Search">⌕</button>
+
+        </form>
+
+        <p class="footer">Private. Independent. Yours.</p>
+
+    </main>
+
+    <!-- BOOKMARKS PANEL -->
+    <section id="bookmarksPanel" class="bookmarks-panel" hidden>
+
+        <div class="bookmarks-header">
+
+            <div>
+                <h2>Bookmarks</h2>
+                <p>Your saved pages</p>
+            </div>
+
+            <div class="bookmarks-header-actions">
+
+                <button
+                    id="saveBookmark"
+                    class="save-bookmark-panel"
+                    title="Save current webpage"
+                >
+                    + Save
+                </button>
+
+                <button
+                    id="closeBookmarks"
+                    class="close-bookmarks"
+                    title="Close bookmarks"
+                >
+                    ×
+                </button>
+
+            </div>
+
+        </div>
+
+        <div id="bookmarkMessage" class="bookmark-message"></div>
+
+        <div id="bookmarksList" class="bookmarks-list"></div>
+
+    </section>
+
+
+    <!-- BROWSING HISTORY SIDE PANEL -->
+    <aside id="historyPanel" class="history-panel" aria-label="Browsing history" hidden>
+        <div class="history-panel-header">
+            <div>
+                <h2>History</h2>
+                <p>Your recently visited pages and searches</p>
+            </div>
+            <button id="closeHistory" class="close-bookmarks" title="Close history" aria-label="Close history">×</button>
+        </div>
+
+        <label class="history-search" for="historySearchInput">
+            <span aria-hidden="true">⌕</span>
+            <input id="historySearchInput" type="search" placeholder="Search history..." autocomplete="off">
+        </label>
+
+        <div class="history-toolbar-row">
+            <span id="historyCount">Recent activity</span>
+            <button id="clearHistory" class="clear-history-button" type="button">Clear history</button>
+        </div>
+
+        <div id="historyList" class="history-list" aria-live="polite"></div>
+    </aside>
+
+    <!-- FRONTEND JAVASCRIPT -->
+    <script src="renderer.js"></script>
+
+</body>
+</html>
