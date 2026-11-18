@@ -10,7 +10,7 @@ The goal is to build a simple, clean, and user-friendly browser while learning d
 
 - **Multiple Tabs:** Open, switch between, and close multiple browser tabs.
 - **Web Navigation:** Visit websites with back, forward, reload, and home controls.
-- **Search Integration:** Search the web using a locally running SearXNG instance.
+- **Search Integration:** Search the web using DuckDuckGo without requiring a locally running search server.
 - **Bookmarks:** Save your favourite websites and manage saved links.
 - **Browsing History:** Automatically record visited websites and searches.
 - **History Side Panel:** View your history in a convenient right-side panel without leaving your current website.
@@ -36,7 +36,7 @@ The goal is to build a simple, clean, and user-friendly browser while learning d
 - HTML – Application structure
 - CSS – Styling and user interface
 - JavaScript – Application functionality
-- [SearXNG](https://docs.searxng.org/) – Privacy-focused metasearch integration
+- [DuckDuckGo](https://duckduckgo.com/) – Privacy-focused web search engine
 
 ## 🚀 Getting Started
 
@@ -78,23 +78,16 @@ npm start
 
 Pluto should now open on your desktop.
 
-## 🔎 Search Engine Setup
+## 🔎 Search Engine
 
-Pluto currently uses a locally running SearXNG instance for web searches.
+Pluto uses **DuckDuckGo** as its default search engine.
 
-By default, Pluto connects to:
+- No local search server is required.
+- No API key or additional search-engine configuration is needed.
+- Web searches are performed directly through DuckDuckGo.
+- Users can search the web immediately after installing and launching Pluto.
 
-```text
-http://localhost:8080
-```
-
-To use search functionality, you need a compatible SearXNG instance running locally at this address.
-
-**Note:** Normal website browsing does not require SearXNG. Only the integrated search functionality depends on it.
-
-SearXNG is maintained separately and is not included in this repository.
-
-Documentation: [SearXNG Documentation](https://docs.searxng.org/)
+Visit [DuckDuckGo](https://duckduckgo.com/) to learn more about its search service and privacy practices.
 
 ## ⌨️ Keyboard Shortcuts
 

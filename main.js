@@ -4,7 +4,11 @@ const path = require("path");
 const fs = require("fs");
 const { pathToFileURL } = require("url");
 
-const SEARCH_ENGINE_URL = "http://localhost:8080";
+// ------------------------------------------
+// CONFIGURATION
+// ------------------------------------------
+
+const SEARCH_ENGINE_URL = "https://duckduckgo.com";
 const TOOLBAR_HEIGHT = 154;
 const HISTORY_PANEL_WIDTH = 360;
 const MAX_HISTORY_ITEMS = 1000;
@@ -169,16 +173,23 @@ function removeBookmark(url) {
 function loadHistory() {
     try {
         const file = historyFile();
+
         if (!fs.existsSync(file)) {
             browsingHistory = [];
             return;
         }
 
         const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+
         browsingHistory = Array.isArray(parsed)
-            ? parsed.filter(item => item && typeof item.url === "string" && isValidWebURL(item.url))
-                .slice(0, MAX_HISTORY_ITEMS)
+            ? parsed.filter(
+                item =>
+                    item &&
+                    typeof item.url === "string" &&
+                    isValidWebURL(item.url)
+            ).slice(0, MAX_HISTORY_ITEMS)
             : [];
+
     } catch (error) {
         console.error("Could not load browsing history:", error);
         browsingHistory = [];
@@ -187,36 +198,66 @@ function loadHistory() {
 
 function saveHistory() {
     try {
-        fs.writeFileSync(historyFile(), JSON.stringify(browsingHistory, null, 2), "utf8");
+        fs.writeFileSync(
+            historyFile(),
+            JSON.stringify(browsingHistory, null, 2),
+            "utf8"
+        );
     } catch (error) {
         console.error("Could not save browsing history:", error);
     }
 }
 
+// Detect DuckDuckGo search URLs.
+function getDuckDuckGoSearchQuery(url) {
+    try {
+        const parsed = new URL(url);
+
+        const isDuckDuckGo =
+            parsed.hostname === "duckduckgo.com" ||
+            parsed.hostname === "www.duckduckgo.com";
+
+        if (!isDuckDuckGo) {
+            return "";
+        }
+
+        return parsed.searchParams.get("q") || "";
+
+    } catch {
+        return "";
+    }
+}
+
 function recordVisit(tab) {
-    if (!tab || tab.isHome || !tab.view || tab.view.webContents.isDestroyed()) return;
+    if (
+        !tab ||
+        tab.isHome ||
+        !tab.view ||
+        tab.view.webContents.isDestroyed()
+    ) {
+        return;
+    }
 
     const webContents = tab.view.webContents;
     const url = webContents.getURL();
+
     if (!isValidWebURL(url)) return;
 
     let kind = "website";
     let query = "";
-    try {
-        const parsed = new URL(url);
-        if (
-            parsed.hostname === "localhost" &&
-            parsed.port === "8080" &&
-            parsed.pathname === "/search"
-        ) {
-            query = parsed.searchParams.get("q") || "";
-            if (query) kind = "search";
-        }
-    } catch { /* URL was validated above. */ }
+
+    // Detect DuckDuckGo searches.
+    query = getDuckDuckGoSearchQuery(url);
+
+    if (query) {
+        kind = "search";
+    }
 
     const entry = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        title: kind === "search" ? `Search: ${query}` : (webContents.getTitle() || url),
+        title: kind === "search"
+            ? `Search: ${query}`
+            : (webContents.getTitle() || url),
         url,
         visitedAt: new Date().toISOString(),
         kind,
@@ -224,21 +265,37 @@ function recordVisit(tab) {
     };
 
     browsingHistory.unshift(entry);
-    browsingHistory = browsingHistory.slice(0, MAX_HISTORY_ITEMS);
+
+    browsingHistory = browsingHistory.slice(
+        0,
+        MAX_HISTORY_ITEMS
+    );
+
     saveHistory();
 }
 
 function removeHistoryEntry(id) {
-    if (typeof id !== "string" || id.length > 100) return browsingHistory;
+    if (typeof id !== "string" || id.length > 100) {
+        return browsingHistory;
+    }
+
     const previousLength = browsingHistory.length;
-    browsingHistory = browsingHistory.filter(item => item.id !== id);
-    if (browsingHistory.length !== previousLength) saveHistory();
+
+    browsingHistory = browsingHistory.filter(
+        item => item.id !== id
+    );
+
+    if (browsingHistory.length !== previousLength) {
+        saveHistory();
+    }
+
     return browsingHistory;
 }
 
 function clearHistory() {
     browsingHistory = [];
     saveHistory();
+
     return browsingHistory;
 }
 
@@ -423,25 +480,25 @@ function createTab() {
 
     // Handle links that try to open a new window.
     webContents.setWindowOpenHandler(({ url }) => {
-    if (isValidWebURL(url)) {
-        navigateTab(id, url);
-    }
+        if (isValidWebURL(url)) {
+            navigateTab(id, url);
+        }
 
-    return { action: "deny" };
+        return { action: "deny" };
     });
 
     // Block unsupported navigation protocols.
     webContents.on("will-navigate", (event, navigationURL) => {
-    if (!isValidWebURL(navigationURL)) {
-        event.preventDefault();
-    }
+        if (!isValidWebURL(navigationURL)) {
+            event.preventDefault();
+        }
     });
 
     // Block redirects to unsupported protocols.
     webContents.on("will-redirect", (event, navigationURL) => {
-    if (!isValidWebURL(navigationURL)) {
-        event.preventDefault();
-    }
+        if (!isValidWebURL(navigationURL)) {
+            event.preventDefault();
+        }
     });
 
     webContents.on("did-navigate", () => {
@@ -558,12 +615,17 @@ function closeTab(id) {
 function getNavigationURL(input) {
     const value = String(input || "").trim();
 
-    if (!value) return SEARCH_ENGINE_URL;
+    // Empty input opens DuckDuckGo.
+    if (!value) {
+        return SEARCH_ENGINE_URL;
+    }
 
+    // Direct HTTP/HTTPS URLs.
     if (/^https?:\/\//i.test(value)) {
         return value;
     }
 
+    // Localhost and IP addresses.
     if (
         /^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(value) ||
         /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(value)
@@ -571,11 +633,13 @@ function getNavigationURL(input) {
         return `http://${value}`;
     }
 
+    // Domain names.
     if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/.*)?$/i.test(value)) {
         return `https://${value}`;
     }
 
-    return `${SEARCH_ENGINE_URL}/search?q=${encodeURIComponent(value)}`;
+    // Search using DuckDuckGo.
+    return `${SEARCH_ENGINE_URL}/?q=${encodeURIComponent(value)}`;
 }
 
 // ------------------------------------------
@@ -610,6 +674,7 @@ async function navigateTab(id, input) {
 
 function goBack() {
     const tab = getActiveTab();
+
     if (!tab) return;
 
     const history = tab.view.webContents.navigationHistory;
@@ -621,6 +686,7 @@ function goBack() {
 
 function goForward() {
     const tab = getActiveTab();
+
     if (!tab) return;
 
     const history = tab.view.webContents.navigationHistory;
@@ -632,6 +698,7 @@ function goForward() {
 
 function reloadTab() {
     const tab = getActiveTab();
+
     if (!tab) return;
 
     if (tab.isHome) {
@@ -644,6 +711,7 @@ function reloadTab() {
 
 function goHome() {
     const tab = getActiveTab();
+
     if (!tab) return;
 
     tab.isHome = true;
@@ -730,7 +798,11 @@ handleTrustedIPC("pluto:toggle-bookmarks-panel", isOpen => {
     if (typeof isOpen !== "boolean") return;
 
     bookmarksPanelOpen = isOpen;
-    if (isOpen) historyPanelOpen = false;
+
+    if (isOpen) {
+        historyPanelOpen = false;
+    }
+
     updateActiveTabBounds();
 });
 
@@ -740,20 +812,33 @@ handleTrustedIPC("pluto:toggle-bookmarks-panel", isOpen => {
 
 handleTrustedIPC("pluto:get-history", () => browsingHistory);
 
-handleTrustedIPC("pluto:remove-history-entry", id => removeHistoryEntry(id));
+handleTrustedIPC("pluto:remove-history-entry", id =>
+    removeHistoryEntry(id)
+);
 
-handleTrustedIPC("pluto:clear-history", () => clearHistory());
+handleTrustedIPC("pluto:clear-history", () =>
+    clearHistory()
+);
 
 handleTrustedIPC("pluto:open-history-entry", url => {
     if (!isValidWebURL(url)) return;
+
     const tab = getActiveTab();
-    if (tab) return navigateTab(tab.id, url);
+
+    if (tab) {
+        return navigateTab(tab.id, url);
+    }
 });
 
 handleTrustedIPC("pluto:toggle-history-panel", isOpen => {
     if (typeof isOpen !== "boolean") return;
+
     historyPanelOpen = isOpen;
-    if (isOpen) bookmarksPanelOpen = false;
+
+    if (isOpen) {
+        bookmarksPanelOpen = false;
+    }
+
     updateActiveTabBounds();
 });
 
@@ -764,11 +849,12 @@ handleTrustedIPC("pluto:toggle-history-panel", isOpen => {
 app.whenReady().then(() => {
 
     session.defaultSession.setPermissionRequestHandler(
-    (webContents, permission, callback) => {
-        // Deny website permissions by default.
-        callback(false);
-    }
-);
+        (webContents, permission, callback) => {
+            // Deny website permissions by default.
+            callback(false);
+        }
+    );
+
     loadBookmarks();
     loadHistory();
     createWindow();
