@@ -6,7 +6,7 @@
   "description": "A personal desktop browser built with Electron",
   "main": "main.js",
   "author": "Param Mavani",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
