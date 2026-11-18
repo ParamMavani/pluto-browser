@@ -1,15 +1,42 @@
+
 {
   "name": "pluto-browser",
   "version": "1.0.0",
+  "productName": "Pluto",
   "description": "A personal desktop browser built with Electron",
   "main": "main.js",
   "author": "Param Mavani",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "pack:mac": "electron-builder --dir --mac --arm64",
+    "dist:mac": "electron-builder --mac dmg --arm64"
   },
   "devDependencies": {
-    "electron": "^45.3.2"
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.parammavani.pluto",
+    "productName": "Pluto",
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Pluto Installer"
+    }
   }
 }

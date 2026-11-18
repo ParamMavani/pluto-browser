@@ -111,7 +111,8 @@ Documentation: [SearXNG Documentation](https://docs.searxng.org/)
 pluto-browser/
 │
 ├── assets/
-│   ├── pluto-logo.svg
+│   ├── icon.icns
+│   ├── pluto-logo.png
 │   └── screenshots/
 │       ├── pluto-homepage.png
 │       └── pluto-history.png
@@ -126,7 +127,8 @@ pluto-browser/
 ├── package-lock.json
 ├── .gitignore
 ├── .gitattributes
-└── LICENSE
+├── LICENSE
+└── README.md
 ```
 
 ## 🔐 Security
