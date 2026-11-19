@@ -91,7 +91,24 @@ function loadBookmarks() {
         if (fs.existsSync(file)) {
             const data = fs.readFileSync(file, "utf8");
             const parsed = JSON.parse(data);
-            bookmarks = Array.isArray(parsed) ? parsed : [];
+            bookmarks = Array.isArray(parsed)
+                ? parsed
+                    .filter(item =>
+                        item &&
+                        typeof item.title === "string" &&
+                        typeof item.url === "string" &&
+                        isValidWebURL(item.url)
+                    )
+                    .map(item => ({
+                        title: item.title,
+                        url: item.url,
+                        createdAt: typeof item.createdAt === "string"
+                            ? item.createdAt
+                            : new Date().toISOString()
+                    }))
+                : [];
+
+            saveBookmarks();
         }
     } catch (error) {
         console.error("Could not load bookmarks:", error);
@@ -320,6 +337,16 @@ function createWindow() {
         }
     });
 
+    mainWindow.webContents.on("will-navigate", (event, navigationURL) => {
+        if (navigationURL !== PLUTO_UI_URL) {
+            event.preventDefault();
+        }
+    });
+
+    mainWindow.webContents.setWindowOpenHandler(() => ({
+        action: "deny"
+    }));
+
     mainWindow.loadFile("index.html").then(() => {
         createTab();
     });
@@ -358,6 +385,7 @@ function getTabState(tab) {
         url: tab.url,
         isHome: tab.isHome,
         isLoading: tab.isLoading,
+        errorMessage: tab.errorMessage,
         canGoBack: history.canGoBack(),
         canGoForward: history.canGoForward()
     };
@@ -425,7 +453,12 @@ function updateActiveTabBounds() {
 
     // The bookmarks panel retains its existing overlay behavior.
     // The History side panel reserves space beside the webpage.
-    if (!activeTab || activeTab.isHome || bookmarksPanelOpen) return;
+    if (
+        !activeTab ||
+        activeTab.isHome ||
+        activeTab.errorMessage ||
+        bookmarksPanelOpen
+    ) return;
 
     const sidePanelWidth = historyPanelOpen
         ? Math.min(HISTORY_PANEL_WIDTH, Math.max(280, width - 500))
@@ -462,7 +495,8 @@ function createTab() {
         title: "New Tab",
         url: "",
         isHome: true,
-        isLoading: false
+        isLoading: false,
+        errorMessage: ""
     };
 
     mainWindow.contentView.addChildView(view);
@@ -477,6 +511,27 @@ function createTab() {
     tabs.push(tab);
 
     const webContents = view.webContents;
+
+    webContents.on("before-input-event", (event, input) => {
+        const isCommandL =
+            input.type === "keyDown" &&
+            input.meta &&
+            !input.control &&
+            !input.alt &&
+            !input.shift &&
+            typeof input.key === "string" &&
+            input.key.toLowerCase() === "l";
+
+        if (!isCommandL) return;
+
+        event.preventDefault();
+
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+
+        mainWindow.focus();
+        mainWindow.webContents.focus();
+        mainWindow.webContents.send("pluto:focus-address");
+    });
 
     // Handle links that try to open a new window.
     webContents.setWindowOpenHandler(({ url }) => {
@@ -503,6 +558,7 @@ function createTab() {
 
     webContents.on("did-navigate", () => {
         tab.isHome = false;
+        tab.errorMessage = "";
         updateTabInfo(tab);
         recordVisit(tab);
         updateActiveTabBounds();
@@ -510,6 +566,7 @@ function createTab() {
 
     webContents.on("did-navigate-in-page", () => {
         tab.isHome = false;
+        tab.errorMessage = "";
         updateTabInfo(tab);
         updateActiveTabBounds();
     });
@@ -520,6 +577,7 @@ function createTab() {
 
     webContents.on("did-start-loading", () => {
         tab.isLoading = true;
+        tab.errorMessage = "";
         sendBrowserState();
     });
 
@@ -535,6 +593,7 @@ function createTab() {
             if (!isMainFrame || errorCode === -3) return;
 
             tab.isLoading = false;
+            tab.errorMessage = `Unable to load this page${errorDescription ? `: ${errorDescription}` : "."}`;
 
             console.error(
                 "Page load failed:",
@@ -542,6 +601,7 @@ function createTab() {
                 validatedURL
             );
 
+            updateActiveTabBounds();
             sendBrowserState();
         }
     );
@@ -549,6 +609,8 @@ function createTab() {
     webContents.on("render-process-gone", () => {
         tab.title = "Page crashed";
         tab.isLoading = false;
+        tab.errorMessage = "This page stopped responding. Return home and try again.";
+        updateActiveTabBounds();
         sendBrowserState();
     });
 
@@ -622,7 +684,7 @@ function getNavigationURL(input) {
 
     // Direct HTTP/HTTPS URLs.
     if (/^https?:\/\//i.test(value)) {
-        return value;
+        return isValidWebURL(value) ? value : null;
     }
 
     // Localhost and IP addresses.
@@ -630,12 +692,14 @@ function getNavigationURL(input) {
         /^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(value) ||
         /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(value)
     ) {
-        return `http://${value}`;
+        const url = `http://${value}`;
+        return isValidWebURL(url) ? url : null;
     }
 
     // Domain names.
     if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/.*)?$/i.test(value)) {
-        return `https://${value}`;
+        const url = `https://${value}`;
+        return isValidWebURL(url) ? url : null;
     }
 
     // Search using DuckDuckGo.
@@ -653,18 +717,33 @@ async function navigateTab(id, input) {
 
     const url = getNavigationURL(input);
 
+    if (!url) {
+        return {
+            success: false,
+            message: "Enter a valid website address or search query."
+        };
+    }
+
     tab.isHome = false;
     tab.url = url;
     tab.isLoading = true;
+    tab.errorMessage = "";
 
     switchTab(id);
 
     try {
         await tab.view.webContents.loadURL(url);
+        return { success: true };
     } catch (error) {
         tab.isLoading = false;
+        tab.errorMessage = "Unable to load this page. Check the address and try again.";
+        updateActiveTabBounds();
         console.error("Navigation error:", error.message);
         sendBrowserState();
+        return {
+            success: false,
+            message: tab.errorMessage
+        };
     }
 }
 
@@ -718,6 +797,7 @@ function goHome() {
     tab.url = "";
     tab.title = "New Tab";
     tab.isLoading = false;
+    tab.errorMessage = "";
 
     updateActiveTabBounds();
     sendBrowserState();

@@ -52,5 +52,21 @@ contextBridge.exposeInMainWorld("pluto", {
         return () => {
             ipcRenderer.removeListener("pluto:state", listener);
         };
+    },
+
+    onFocusAddress: (callback) => {
+        if (typeof callback !== "function") {
+            throw new TypeError("Callback must be a function");
+        }
+
+        const listener = () => {
+            callback();
+        };
+
+        ipcRenderer.on("pluto:focus-address", listener);
+
+        return () => {
+            ipcRenderer.removeListener("pluto:focus-address", listener);
+        };
     }
 });

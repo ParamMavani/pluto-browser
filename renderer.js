@@ -27,9 +27,13 @@ exposed by preload.js.
 const tabsContainer = document.getElementById("tabs");
 const addressInput = document.getElementById("addressInput");
 const homePage = document.getElementById("homePage");
+const errorPage = document.getElementById("errorPage");
+const errorMessage = document.getElementById("errorMessage");
 
 const bookmarksPanel = document.getElementById("bookmarksPanel");
 const bookmarksList = document.getElementById("bookmarksList");
+const bookmarkSearchInput = document.getElementById("bookmarkSearchInput");
+const bookmarkCount = document.getElementById("bookmarkCount");
 const bookmarkMessage = document.getElementById("bookmarkMessage");
 const historyPanel = document.getElementById("historyPanel");
 const historyList = document.getElementById("historyList");
@@ -45,6 +49,25 @@ let browserState = {
     tabs: [],
     activeTabId: null
 };
+
+function keepActiveTabVisible() {
+    const activeTab = tabsContainer.querySelector(".tab.active");
+
+    if (!activeTab) return;
+
+    const tabStart = activeTab.offsetLeft;
+    const tabEnd = tabStart + activeTab.offsetWidth;
+    const visibleStart = tabsContainer.scrollLeft;
+    const visibleEnd = visibleStart + tabsContainer.clientWidth;
+
+    if (tabStart < visibleStart || tabEnd > visibleEnd) {
+        activeTab.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "nearest"
+        });
+    }
+}
 
 
 // ================================================
@@ -66,7 +89,19 @@ function renderTabs() {
                     : ""
             );
 
+        tabElement.setAttribute("role", "tab");
+        tabElement.setAttribute(
+            "aria-selected",
+            String(tab.id === browserState.activeTabId)
+        );
+        tabElement.setAttribute("aria-label", tab.title || "New Tab");
         tabElement.title = tab.title;
+
+        const favicon = document.createElement("img");
+        favicon.className = "tab-favicon";
+        favicon.src = "assets/pluto-logo.png";
+        favicon.alt = "";
+        favicon.setAttribute("aria-hidden", "true");
 
         const title = document.createElement("span");
         title.className = "tab-title";
@@ -74,8 +109,13 @@ function renderTabs() {
 
         const closeButton = document.createElement("button");
         closeButton.className = "close-tab";
+        closeButton.type = "button";
         closeButton.textContent = "×";
         closeButton.title = "Close tab";
+        closeButton.setAttribute(
+            "aria-label",
+            `Close ${tab.title || "New Tab"}`
+        );
 
         closeButton.addEventListener("click", async event => {
 
@@ -91,13 +131,22 @@ function renderTabs() {
 
         });
 
-        tabElement.append(title, closeButton);
+        tabElement.append(favicon, title, closeButton);
 
         tabsContainer.appendChild(tabElement);
 
     });
 
+    requestAnimationFrame(keepActiveTabVisible);
+
 }
+
+tabsContainer.addEventListener("wheel", event => {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    tabsContainer.scrollLeft += event.deltaY;
+    event.preventDefault();
+}, { passive: false });
 
 
 // ================================================
@@ -106,6 +155,7 @@ function renderTabs() {
 
 function updateInterface(state) {
 
+    const activeTabChanged = browserState.activeTabId !== state.activeTabId;
     browserState = state;
 
     renderTabs();
@@ -116,9 +166,16 @@ function updateInterface(state) {
 
     if (!activeTab) return;
 
-    homePage.hidden = !activeTab.isHome;
+    homePage.hidden = !activeTab.isHome || Boolean(activeTab.errorMessage);
+    errorPage.hidden = !activeTab.errorMessage;
+    errorMessage.textContent = activeTab.errorMessage || "";
 
     addressInput.value = activeTab.url || "";
+    addressInput.setAttribute("aria-busy", String(activeTab.isLoading));
+    document.getElementById("reload").classList.toggle(
+        "loading",
+        activeTab.isLoading
+    );
 
     document.getElementById("back").disabled =
         !activeTab.canGoBack;
@@ -131,7 +188,22 @@ function updateInterface(state) {
 
     document.getElementById("saveBookmark").disabled =
         activeTab.isHome;
+    document.getElementById("saveBookmark").setAttribute(
+        "aria-label",
+        activeTab.isHome
+            ? "Save bookmark unavailable on the Pluto home page"
+            : "Save current webpage as a bookmark"
+    );
 
+    if (activeTabChanged && activeTab.isHome && !activeTab.errorMessage) {
+        requestAnimationFrame(focusAddressBar);
+    }
+
+}
+
+function focusAddressBar() {
+    addressInput.focus();
+    addressInput.select();
 }
 
 
@@ -147,7 +219,11 @@ async function navigate(input) {
 
     try {
 
-        await window.pluto.navigate(value);
+        const result = await window.pluto.navigate(value);
+
+        if (result && !result.success) {
+            errorMessage.textContent = result.message;
+        }
 
     } catch (error) {
 
@@ -172,6 +248,13 @@ document.getElementById("addressForm").addEventListener(
 
     }
 );
+
+addressInput.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.isComposing) {
+        event.preventDefault();
+        navigate(addressInput.value);
+    }
+});
 
 
 // ================================================
@@ -220,6 +303,11 @@ document.getElementById("reload").onclick =
 
 document.getElementById("home").onclick =
     () => window.pluto.home();
+
+document.getElementById("errorHome").addEventListener(
+    "click",
+    () => window.pluto.home()
+);
 
 
 // ================================================
@@ -272,6 +360,14 @@ function showBookmarkMessage(message) {
 
 }
 
+function createBookmarkIcon() {
+    const fallback = document.createElement("span");
+    fallback.className = "bookmark-item-icon fallback";
+    fallback.textContent = "★";
+    fallback.setAttribute("aria-hidden", "true");
+    return fallback;
+}
+
 
 // ================================================
 // RENDER BOOKMARKS
@@ -284,21 +380,31 @@ async function renderBookmarks() {
     try {
 
         const bookmarks = await window.pluto.getBookmarks();
+        const searchTerm = bookmarkSearchInput.value.trim().toLowerCase();
+        const filtered = bookmarks.filter(bookmark =>
+            !searchTerm ||
+            (bookmark.title || "").toLowerCase().includes(searchTerm) ||
+            (bookmark.url || "").toLowerCase().includes(searchTerm)
+        );
 
-        if (!bookmarks || bookmarks.length === 0) {
+        bookmarkCount.textContent =
+            `${filtered.length} ${filtered.length === 1 ? "bookmark" : "bookmarks"}`;
+
+        if (!filtered.length) {
 
             const emptyMessage = document.createElement("p");
 
             emptyMessage.className = "empty-bookmarks";
-            emptyMessage.textContent = "No bookmarks saved yet.";
+            emptyMessage.textContent = bookmarks.length
+                ? "No bookmarks match your search."
+                : "Save a page to find it here later.";
 
             bookmarksList.appendChild(emptyMessage);
 
             return;
-
         }
 
-        bookmarks.forEach(bookmark => {
+        filtered.forEach(bookmark => {
 
             const item = document.createElement("div");
             item.className = "bookmark-item";
@@ -323,6 +429,7 @@ async function renderBookmarks() {
 
             const openButton = document.createElement("button");
 
+            openButton.type = "button";
             openButton.textContent = "Open";
             openButton.title = "Open bookmark";
 
@@ -340,6 +447,7 @@ async function renderBookmarks() {
 
             const deleteButton = document.createElement("button");
 
+            deleteButton.type = "button";
             deleteButton.textContent = "×";
             deleteButton.title = "Delete bookmark";
             deleteButton.className = "delete-bookmark";
@@ -356,7 +464,7 @@ async function renderBookmarks() {
 
             actions.append(openButton, deleteButton);
 
-            item.append(details, actions);
+            item.append(createBookmarkIcon(), details, actions);
 
             bookmarksList.appendChild(item);
 
@@ -395,6 +503,7 @@ document.getElementById("bookmarksButton").addEventListener(
         if (!bookmarksPanel.hidden) {
 
             showBookmarkMessage("");
+            bookmarkSearchInput.value = "";
 
             await renderBookmarks();
 
@@ -418,6 +527,8 @@ document.getElementById("closeBookmarks").addEventListener(
 
     }
 );
+
+bookmarkSearchInput.addEventListener("input", renderBookmarks);
 
 
 // ================================================
@@ -562,6 +673,13 @@ historySearchInput.addEventListener("input", renderHistory);
 document.getElementById("clearHistory").addEventListener("click", async () => {
     const entries = await window.pluto.getHistory();
     if (!entries.length) return;
+
+    const confirmed = window.confirm(
+        "Clear all browsing history and search history?"
+    );
+
+    if (!confirmed) return;
+
     await window.pluto.clearHistory();
     await renderHistory();
 });
@@ -571,6 +689,7 @@ document.getElementById("clearHistory").addEventListener("click", async () => {
 // ================================================
 
 window.pluto.onState(updateInterface);
+window.pluto.onFocusAddress(focusAddressBar);
 
 // Load initial browser state
 
@@ -584,14 +703,27 @@ window.pluto.getState().then(updateInterface);
 
 window.addEventListener("keydown", event => {
 
+    if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        !event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey
+    ) {
+        return;
+    }
+
+    const key = event.key.toLowerCase();
+
     // Command + T → New tab
-    if (event.metaKey && event.key.toLowerCase() === "t") {
+    if (key === "t") {
         event.preventDefault();
         window.pluto.newTab();
     }
 
     // Command + W → Close active tab
-    if (event.metaKey && event.key.toLowerCase() === "w") {
+    if (key === "w") {
         event.preventDefault();
 
         if (browserState.activeTabId) {
@@ -600,10 +732,9 @@ window.addEventListener("keydown", event => {
     }
 
     // Command + L → Focus address bar
-    if (event.metaKey && event.key.toLowerCase() === "l") {
+    if (key === "l") {
         event.preventDefault();
-        addressInput.focus();
-        addressInput.select();
+        focusAddressBar();
     }
 
     // Escape closes whichever side panel is open.

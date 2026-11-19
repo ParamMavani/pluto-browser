@@ -9,11 +9,34 @@
     box-sizing: border-box;
 }
 
+:root {
+    color-scheme: dark;
+    --pluto-bg: #10111b;
+    --pluto-surface: #191a29;
+    --pluto-surface-raised: #242438;
+    --pluto-border: #343348;
+    --pluto-muted: #aaa9c2;
+    --pluto-purple: #7770db;
+    --pluto-purple-bright: #9285ff;
+}
+
 body {
-    background: #10111b;
+    background: var(--pluto-bg);
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+.tab:focus-visible {
+    outline: 2px solid #b29aff;
+    outline-offset: 2px;
 }
 
 /* ================================================
@@ -22,8 +45,10 @@ body {
 
 .browser-header {
     height: 154px;
-    background: #191a29;
-    border-bottom: 1px solid #343348;
+    background:
+        linear-gradient(180deg, rgba(38, 35, 67, 0.3), transparent 58%),
+        var(--pluto-surface);
+    border-bottom: 1px solid var(--pluto-border);
     position: relative;
     z-index: 2;
 }
@@ -38,7 +63,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 5px 12px;
-    background: #12131f;
+    background: transparent;
     border-bottom: 1px solid #29293b;
 }
 
@@ -49,6 +74,9 @@ body {
     flex: 1;
     min-width: 0;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
 }
 
 .tabs::-webkit-scrollbar {
@@ -59,27 +87,46 @@ body {
     height: 33px;
     min-width: 110px;
     max-width: 220px;
-    flex: 1;
+    flex: 0 1 220px;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 0 10px;
-    background: #242438;
+    background: rgba(36, 36, 56, 0.72);
     color: #aaa9c2;
     border-radius: 9px 9px 0 0;
     cursor: pointer;
     font-size: 12px;
-    transition: background 0.15s ease;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        transform 0.15s ease;
+}
+
+.tab-favicon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: drop-shadow(0 0 4px rgba(146, 133, 255, 0.3));
 }
 
 .tab:hover {
     background: #30304a;
+    color: #ffffff;
 }
 
 .tab.active {
-    background: #303047;
+    position: relative;
+    z-index: 1;
+    align-self: flex-end;
+    height: 38px;
+    margin-bottom: -5px;
+    background: var(--pluto-surface);
     color: #ffffff;
-    border-top: 2px solid #9285ff;
+    box-shadow:
+        inset 0 2px 0 rgba(146, 133, 255, 0.72),
+        0 -1px 0 var(--pluto-surface);
 }
 
 .tab-title {
@@ -98,6 +145,17 @@ body {
     color: #aaa9c2;
     font-size: 17px;
     cursor: pointer;
+    opacity: 0.72;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.tab:hover .close-tab,
+.tab.active .close-tab,
+.close-tab:focus-visible {
+    opacity: 1;
 }
 
 .close-tab:hover {
@@ -108,16 +166,30 @@ body {
 .new-tab {
     width: 30px;
     height: 30px;
+    flex-shrink: 0;
     border: none;
-    border-radius: 8px;
-    background: #7770db;
-    color: white;
-    font-size: 22px;
+    border-radius: 50%;
+    background: transparent;
+    color: #c6c4dd;
+    font-size: 24px;
+    line-height: 1;
     cursor: pointer;
+    box-shadow: none;
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        color 0.2s ease;
 }
 
 .new-tab:hover {
-    background: #9285ff;
+    background: rgba(119, 112, 219, 0.22);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.new-tab:active {
+    background: rgba(146, 133, 255, 0.32);
+    transform: translateY(0);
 }
 
 /* ================================================
@@ -126,7 +198,7 @@ body {
 
 .toolbar {
     height: 110px;
-    padding: 10px 22px;
+    padding: 10px clamp(14px, 2.5vw, 30px);
 }
 
 /* ================================================
@@ -222,11 +294,20 @@ body {
 
 .navigation > button:hover {
     background: #303047;
+    color: #ffffff;
 }
 
 .navigation > button:disabled {
     opacity: 0.35;
     cursor: default;
+}
+
+.navigation > button.loading {
+    animation: toolbar-spin 0.9s linear infinite;
+}
+
+@keyframes toolbar-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ================================================
@@ -238,36 +319,47 @@ body {
     align-items: center;
     flex: 1;
     min-width: 0;
-    height: 44px;
+    height: 40px;
 
     background: linear-gradient(
         135deg,
-        #29283c,
-        #252438
+        rgba(47, 46, 70, 0.96),
+        rgba(35, 35, 56, 0.96)
     );
 
     border: 1px solid #494564;
     border-radius: 30px;
-    padding: 4px 7px 4px 22px;
+    padding: 3px 4px 3px 16px;
 
     transition:
         border-color 0.25s ease,
         box-shadow 0.25s ease,
         background 0.25s ease;
+    box-shadow: 0 5px 18px rgba(4, 4, 18, 0.16);
 }
 
 .address-form:hover {
     border-color: #69628f;
+    background: linear-gradient(
+        135deg,
+        rgba(53, 52, 78, 0.98),
+        rgba(39, 39, 62, 0.98)
+    );
 }
 
 .address-form:focus-within {
     border-color: #9285ff;
 
     box-shadow:
-        0 0 0 3px rgba(146, 133, 255, 0.10),
-        0 4px 18px rgba(100, 85, 200, 0.10);
+        0 0 0 3px rgba(146, 133, 255, 0.16),
+        0 0 20px rgba(119, 112, 219, 0.20),
+        0 6px 20px rgba(20, 16, 48, 0.16);
 
-    background: #2b2941;
+    background: #302f48;
+}
+
+.address-form:active {
+    border-color: #a99aff;
 }
 
 .address-form input {
@@ -279,9 +371,10 @@ body {
     background: transparent;
 
     color: #ffffff;
-    font-size: 15px;
+    font-size: 14px;
     font-family: inherit;
-    letter-spacing: 0.1px;
+    letter-spacing: 0.05px;
+    caret-color: #b29aff;
 }
 
 .address-form input::placeholder {
@@ -290,8 +383,8 @@ body {
 }
 
 .address-form button {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     flex-shrink: 0;
 
     display: flex;
@@ -304,17 +397,19 @@ body {
     background: #7770db;
     color: white;
 
-    font-size: 20px;
+    font-size: 23px;
     cursor: pointer;
 
     transition:
         background 0.2s ease,
-        transform 0.2s ease;
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .address-form button:hover {
     background: #9285ff;
     transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(146, 133, 255, 0.24);
 }
 
 .address-form button:active {
@@ -327,6 +422,10 @@ body {
 
 .toolbar-icon {
     font-size: 19px !important;
+}
+
+.history-toolbar-button {
+    margin-left: 2px;
 }
 
 /* ================================================
@@ -346,6 +445,7 @@ body {
     isolation: isolate;
 
     background: #050615;
+    padding: 24px;
 }
 
 #homePage[hidden] {
@@ -601,7 +701,7 @@ h1 {
     background: #7770db;
     color: white;
 
-    font-size: 21px;
+    font-size: 25px;
     cursor: pointer;
 
     transition:
@@ -626,6 +726,49 @@ h1 {
     font-size: 12px;
     letter-spacing: 2px;
 }
+
+/* ================================================
+   ERROR STATE
+================================================ */
+
+.error-page {
+    height: calc(100vh - 154px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px;
+    background: #050615;
+    color: #c0bdd9;
+    text-align: center;
+}
+
+.error-page[hidden] { display: none !important; }
+.error-page h1 { font-size: 32px; letter-spacing: 3px; }
+.error-page p { max-width: 520px; color: #9290ad; font-size: 13px; }
+.error-mark {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #655b94;
+    border-radius: 50%;
+    background: #252438;
+    color: #b29aff;
+    font-size: 24px;
+    font-weight: 700;
+}
+.error-page button {
+    margin-top: 8px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 9px;
+    background: #7770db;
+    color: #fff;
+    cursor: pointer;
+}
+.error-page button:hover { background: #9285ff; }
 
 /* ================================================
    BOOKMARKS PANEL
@@ -700,7 +843,7 @@ h1 {
     border: none;
     border-radius: 8px;
 
-    background: #7770db;
+    background: linear-gradient(135deg, #7770db, #5f70cc);
     color: white;
 
     font-size: 12px;
@@ -708,16 +851,25 @@ h1 {
 
     cursor: pointer;
 
-    transition: background 0.2s ease;
+    box-shadow: 0 4px 12px rgba(119, 112, 219, 0.22);
+    transition:
+        background 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
 }
 
 .save-bookmark-panel:hover {
     background: #9285ff;
+    box-shadow: 0 5px 16px rgba(146, 133, 255, 0.3);
 }
 
 .save-bookmark-panel:disabled {
-    opacity: 0.4;
+    background: #303047;
+    border: 1px solid #393952;
+    color: #85839f;
+    opacity: 1;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
 /* ================================================
@@ -754,6 +906,47 @@ h1 {
     font-size: 12px;
 }
 
+.panel-search {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 38px;
+    margin-top: 15px;
+    padding: 0 12px;
+    border: 1px solid #393952;
+    border-radius: 9px;
+    background: #25253a;
+    color: #a99aff;
+    font-size: 19px;
+}
+
+.panel-search:focus-within {
+    border-color: #9285ff;
+    box-shadow: 0 0 0 3px rgba(146, 133, 255, 0.1);
+}
+
+.panel-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 12px;
+}
+
+.panel-search input::placeholder {
+    color: #9290ad;
+}
+
+.panel-count-row {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    color: #9290ad;
+    font-size: 11px;
+}
+
 /* ================================================
    BOOKMARK LIST
 ================================================ */
@@ -788,9 +981,27 @@ h1 {
     background: #303047;
 }
 
+.bookmark-item-icon {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 8px;
+    background: #302d4a;
+    color: #c1b6ff;
+    font-size: 14px;
+}
+
+.bookmark-item-icon:not(.fallback) {
+    padding: 6px;
+    object-fit: contain;
+}
+
 .bookmark-details {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
 }
 
 .bookmark-title {
@@ -822,6 +1033,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .bookmark-actions button {
@@ -980,6 +1192,26 @@ h1 {
     .history-panel { width: 320px; }
 }
 
+@media (max-width: 760px) {
+    .toolbar { padding-inline: 12px; }
+    .brand { font-size: 14px; letter-spacing: 2px; }
+    .navigation { gap: 4px; }
+    .navigation > button { width: 32px; }
+    .address-form { padding-left: 14px; }
+    .address-form input { font-size: 13px; }
+    .history-panel { max-width: 88vw; }
+    .bookmarks-panel { right: 10px; width: calc(100vw - 20px); }
+}
+
+@media (max-height: 720px) {
+    .planet { width: 76px; height: 76px; margin-bottom: 8px; }
+    h1 { font-size: 48px; }
+    .home-search { margin-top: 24px; }
+    .footer { bottom: 16px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .history-panel { animation: none; }
+    .history-panel,
+    .new-tab,
+    .navigation > button.loading { animation: none; }
 }
